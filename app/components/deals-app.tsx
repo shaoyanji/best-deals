@@ -413,10 +413,12 @@ export default function DealsApp({
     ? savedDeals.map((d) => feed.deals.find((f) => f.id === d.id) ?? d)
     : feed.deals;
   const filtered = filterDeals(allDeals, query, category, region, sort);
+  const savedPending = savedOnly && !savedLoaded;
   const pricedCount = filtered.filter((deal) => deal.price !== null).length;
   const hasSearchFilters = query.trim() !== "" || category !== "All finds";
-  const sortHelp =
-    region === "all"
+  const sortHelp = savedPending
+    ? ""
+    : region === "all"
       ? "Choose one region to sort by price. US and UK currencies are not converted."
       : !pricedCount
         ? "Price sorting is unavailable for these results: the sources have not provided sortable prices. Check each source for the current price."
@@ -465,9 +467,9 @@ export default function DealsApp({
             >
               <Bookmark size={16} />
               Saved finds{" "}
-              <span className="saved-count">
-                {savedLoaded ? savedDeals.length : 0}
-              </span>
+              {savedLoaded && (
+                <span className="saved-count">{savedDeals.length}</span>
+              )}
             </button>
           </nav>
           <div className="header-right">
@@ -634,7 +636,7 @@ export default function DealsApp({
                     : category !== "All finds"
                       ? `${category} finds`
                       : "Fresh finds, worth a look."}
-                <span>{filtered.length}</span>
+                {!savedPending && <span>{filtered.length}</span>}
               </h2>
             </div>
             <div className="toolbar-right">
@@ -659,7 +661,7 @@ export default function DealsApp({
                   <option value="discount">Biggest % off</option>
                   {region !== "all" && (
                     <option value="price" disabled={!pricedCount}>
-                      {pricedCount
+                      {pricedCount || savedPending
                         ? "Price: low to high"
                         : "Price: unavailable"}
                     </option>
@@ -706,9 +708,9 @@ export default function DealsApp({
             </p>
           )}
           <div aria-live="polite" className="sr-only">
-            {filtered.length} deals found
+            {savedPending ? "" : `${filtered.length} deals found`}
           </div>
-          {savedOnly && !savedLoaded ? (
+          {savedPending ? (
             <p className="saved-explainer" role="status">
               Loading your saved finds…
             </p>
