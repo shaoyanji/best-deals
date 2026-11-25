@@ -1,6 +1,6 @@
 :root {
   --ink: #20271f;
-  --muted: #73796e;
+  --muted: #5c6853;
   --paper: #f8f9f6;
   --line: #e1e5dc;
   --green: #d5f46a;
@@ -51,7 +51,8 @@ a {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[tabindex="-1"]:focus-visible {
   outline: 3px solid #66953b;
   outline-offset: 4px;
 }
@@ -228,11 +229,11 @@ h1 > span {
 .source-pills > span {
   font-size: 7px;
   letter-spacing: 1px;
-  color: #87917d;
+  color: var(--muted);
 }
 .source-pills > b {
   font-size: 10px;
-  color: #747e6e;
+  color: var(--muted);
   font-weight: 600;
   letter-spacing: -0.2px;
 }
@@ -402,12 +403,13 @@ h1 > span {
   outline: none;
 }
 .search-box input::placeholder {
-  color: #92988d;
+  color: var(--muted);
+  opacity: 1;
 }
 .search-hint {
   white-space: nowrap;
   font-size: 9px;
-  color: #a1a797;
+  color: var(--muted);
   background: #f4f6ef;
   border-radius: 4px;
   padding: 5px 7px;
@@ -433,10 +435,9 @@ h1 > span {
 }
 .categories {
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
   padding: 19px 0 27px;
-  overflow: auto;
-  scrollbar-width: none;
   border-bottom: 1px solid var(--line);
 }
 .categories button {
@@ -470,7 +471,7 @@ h1 > span {
 .section-kicker {
   font-size: 7px;
   letter-spacing: 1.3px;
-  color: #92998b;
+  color: var(--muted);
   margin-bottom: 7px;
   font-weight: 600;
 }
@@ -480,6 +481,7 @@ h1 > span {
   letter-spacing: -0.9px;
   font-weight: 700;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
@@ -490,7 +492,7 @@ h1 > span {
   font-family: var(--font-sans), sans-serif;
   font-size: 10px;
   letter-spacing: 0;
-  color: #748165;
+  color: var(--muted);
 }
 .toolbar-right {
   display: flex;
@@ -502,7 +504,7 @@ h1 > span {
   gap: 6px;
   align-items: center;
   font-size: 10px;
-  color: #7b8572;
+  color: var(--muted);
   padding: 8px 0;
 }
 .sort-select {
@@ -616,7 +618,7 @@ h1 > span {
   text-transform: uppercase;
   font-size: 8px;
   letter-spacing: 0.8px;
-  color: #8c9484;
+  color: var(--muted);
 }
 .merchant-line > span:first-child {
   white-space: nowrap;
@@ -629,7 +631,7 @@ h1 > span {
   padding: 3px 4px;
   border-radius: 3px;
   letter-spacing: 0.5px;
-  color: #7b866d;
+  color: var(--muted);
 }
 .card-content h3 {
   margin-top: 9px;
@@ -666,7 +668,7 @@ h1 > span {
 }
 .card-price > span {
   font-size: 8px;
-  color: #9aa18f;
+  color: var(--muted);
 }
 .card-bottom {
   display: flex;
@@ -678,7 +680,7 @@ h1 > span {
 }
 .card-bottom > span {
   font-size: 8px;
-  color: #929a89;
+  color: var(--muted);
 }
 .muted-dot {
   padding: 0 2px;
@@ -705,7 +707,7 @@ h1 > span {
 }
 .load-more > span {
   font-size: 9px;
-  color: #959d8b;
+  color: var(--muted);
 }
 .secondary {
   border: 1px solid #cdd6c2;
@@ -742,7 +744,7 @@ h1 > span {
   gap: 12px;
   padding: 25px 0 0;
   font-size: 9px;
-  color: #8a947d;
+  color: var(--muted);
 }
 .feed-footer > span:first-child {
   display: flex;
@@ -783,13 +785,13 @@ h1 > span {
 }
 .promise-band p {
   font-size: 11px;
-  color: #8a947e;
+  color: var(--muted);
   margin-top: 5px;
 }
 .promise-small {
   margin-left: auto;
   font-size: 10px;
-  color: #8a947e;
+  color: var(--muted);
 }
 .site-footer {
   padding-top: 34px;
@@ -808,7 +810,7 @@ h1 > span {
 }
 .footer-top > p {
   font-size: 10px;
-  color: #939b89;
+  color: var(--muted);
 }
 .footer-top > a:last-child {
   display: flex;
@@ -824,7 +826,7 @@ h1 > span {
   gap: 30px;
   font-size: 8px;
   line-height: 1.8;
-  color: #9aa38e;
+  color: var(--muted);
 }
 .footer-bottom p {
   max-width: 700px;
@@ -858,7 +860,7 @@ h1 > span {
   display: flex;
   align-items: center;
   flex-direction: column;
-  color: #6b7c59;
+  color: var(--muted);
 }
 .empty-state h3 {
   font-size: 23px;
@@ -877,7 +879,7 @@ h1 > span {
   font-size: 12px;
   line-height: 1.7;
   margin-bottom: 20px;
-  color: #7c876e;
+  color: var(--muted);
 }
 .feed-warning {
   border-radius: 7px;
@@ -954,7 +956,7 @@ h1 > span {
 .dialog-content > p {
   font-size: 12px;
   line-height: 1.9;
-  color: #76816b;
+  color: var(--muted);
 }
 .source-note {
   display: flex;
@@ -965,7 +967,7 @@ h1 > span {
   margin: 20px 0;
   font-size: 10px;
   line-height: 1.8;
-  color: #7a866f;
+  color: var(--muted);
 }
 .source-note svg {
   flex-shrink: 0;
@@ -1418,8 +1420,7 @@ h1 > span {
     padding: 8px 0;
   }
   .categories {
-    margin-right: -20px;
-    padding: 16px 20px 21px 0;
+    padding: 16px 0 21px;
     gap: 7px;
   }
   .categories button {
