@@ -33,6 +33,7 @@ import {
   type Region,
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
+import { readBrowseState, writeBrowseState } from "@/lib/browse-state";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
 const money = (deal: Deal) =>
@@ -235,8 +236,59 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [browseLoaded, setBrowseLoaded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const restore = () => {
+      const state = readBrowseState(window.location.search);
+      setQuery(state.query);
+      setCategory(state.category);
+      setRegion(state.region);
+      setSort(state.sort);
+      setSavedOnly(state.savedOnly);
+      setBrowseLoaded(true);
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    if (!browseLoaded) return;
+    const search = writeBrowseState(window.location.search, {
+      query,
+      category,
+      region,
+      sort,
+      savedOnly,
+    });
+    const url = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+    window.history.replaceState(window.history.state, "", url);
+  }, [browseLoaded, query, category, region, sort, savedOnly]);
+  useEffect(() => {
+    const restoreDialog = () => {
+      const id = window.history.state?.bestdealsDeal;
+      setActiveDeal(
+        [...feed.deals, ...savedDeals].find((deal) => deal.id === id) ?? null,
+      );
+    };
+    restoreDialog();
+    window.addEventListener("popstate", restoreDialog);
+    return () => window.removeEventListener("popstate", restoreDialog);
+  }, [feed.deals, savedDeals]);
+
+  function openDeal(deal: Deal) {
+    window.history.pushState(
+      { ...window.history.state, bestdealsDeal: deal.id },
+      "",
+    );
+    setActiveDeal(deal);
+  }
+  function closeDeal() {
+    if (window.history.state?.bestdealsDeal) window.history.back();
+    else setActiveDeal(null);
+  }
 
   useEffect(() => {
     try {
@@ -404,7 +456,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             {featured ? (
               <button
                 className="feature-card"
-                onClick={() => setActiveDeal(featured)}
+                onClick={() => openDeal(featured)}
               >
                 <div className="feature-top">
                   <span>THE GOOD FIND EDIT</span>
@@ -572,7 +624,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                   deal={deal}
                   saved={savedIds.includes(deal.id)}
                   toggle={toggle}
-                  open={setActiveDeal}
+                  open={openDeal}
                 />
               ))}
             </div>
@@ -594,14 +646,17 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               <button
                 className="primary"
                 onClick={() => {
-                  clear();
+                  setQuery("");
+                  setCategory("All finds");
                   if (!feed.deals.length && !savedOnly) void refresh();
                   else setSavedOnly(false);
                 }}
               >
                 {!feed.deals.length && !savedOnly
                   ? "Try refreshing"
-                  : "Explore all finds"}
+                  : region === "all"
+                    ? "Explore all finds"
+                    : `Explore ${region} finds`}
                 <ArrowRight size={17} />
               </button>
             </div>
@@ -676,7 +731,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           deal={activeDeal}
           saved={savedIds.includes(activeDeal.id)}
           toggle={toggle}
-          close={() => setActiveDeal(null)}
+          close={closeDeal}
         />
       )}
       {notice && (
