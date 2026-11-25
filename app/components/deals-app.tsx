@@ -194,14 +194,39 @@ function DealDialog({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      const target = opener instanceof HTMLElement && opener.isConnected
+        ? opener
+        : document.getElementById("results-title");
+      target?.focus();
+    };
   }, []);
   return (
     <dialog
       ref={ref}
       className="deal-dialog"
-      onCancel={close}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = event.currentTarget.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], [tabindex="0"]',
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}
@@ -257,7 +282,7 @@ function DealDialog({
           onClick={() => toggle(deal)}
         >
           <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
-          {saved ? "Saved to your finds" : "Save for later"}
+          {saved ? "Remove from saved finds" : "Save for later"}
         </button>
       </div>
     </dialog>
@@ -279,8 +304,14 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const resultsRef = useRef<HTMLElement>(null);
   const visitOnly = useRef(false);
+  const resultsTitleRef = useRef<HTMLHeadingElement>(null);
+  const previousView = useRef(savedOnly);
+
+  useEffect(() => {
+    if (previousView.current !== savedOnly) resultsTitleRef.current?.focus();
+    previousView.current = savedOnly;
+  }, [savedOnly]);
 
   useEffect(() => {
     function syncSaved() {
@@ -400,6 +431,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           <nav aria-label="Main navigation">
             <button
               className={!savedOnly ? "nav-active" : ""}
+              aria-current={!savedOnly ? "page" : undefined}
               onClick={() => {
                 navigateSaved(false);
                 clear();
@@ -409,10 +441,10 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             </button>
             <button
               className={savedOnly ? "nav-active" : ""}
+              aria-current={savedOnly ? "page" : undefined}
               onClick={() => {
                 navigateSaved(true);
                 clear();
-                resultsRef.current?.scrollIntoView({ behavior: "smooth" });
               }}
             >
               <Bookmark size={16} />
@@ -512,7 +544,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
         <section
           className="browse-section wrap"
           id="finds"
-          ref={resultsRef}
           aria-labelledby="results-title"
         >
           <div className="search-row">
@@ -579,7 +610,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               <div className="section-kicker">
                 A LITTLE DISCOVERY GOES A LONG WAY
               </div>
-              <h2 id="results-title">
+              <h2 id="results-title" ref={resultsTitleRef} tabIndex={-1}>
                 {savedOnly
                   ? "Your saved finds"
                   : query
