@@ -34,8 +34,9 @@ import {
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
 import {
-  parseSavedDeals,
+  readSavedDeals,
   savedAvailability,
+  savedDealPrefix,
   savedDealsKey,
   updateSavedDeal,
   type SavedAvailability,
@@ -306,7 +307,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const visitOnly = useRef(false);
-  const pendingSaves = useRef(new Set<string>());
   const resultsTitleRef = useRef<HTMLHeadingElement>(null);
   const previousView = useRef(savedOnly);
 
@@ -318,8 +318,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   useEffect(() => {
     function syncSaved() {
       try {
-        if (!visitOnly.current)
-          setSavedDeals(parseSavedDeals(localStorage.getItem(savedDealsKey)));
+        if (!visitOnly.current) setSavedDeals(readSavedDeals(localStorage));
       } catch {
         // Preserve visit-only saves when storage is unavailable or unreadable.
       }
@@ -329,7 +328,9 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     function storageChanged(event: StorageEvent) {
       if (
         event.storageArea === localStorage &&
-        (event.key === savedDealsKey || event.key === null)
+        (event.key === savedDealsKey ||
+          event.key?.startsWith(savedDealPrefix) ||
+          event.key === null)
       )
         syncSaved();
     }
@@ -360,19 +361,11 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  async function toggle(deal: Deal) {
-    if (pendingSaves.current.has(deal.id)) return;
-    pendingSaves.current.add(deal.id);
+  function toggle(deal: Deal) {
     const exists = savedDeals.some((d) => d.id === deal.id);
     try {
       if (visitOnly.current) throw new Error("Visit-only saves");
-      // A localStorage read/write pair is not atomic across browser tabs.
-      // Hold the same-origin lock until the full mutation has persisted.
-      const write = () => updateSavedDeal(localStorage, deal, !exists);
-      const next = navigator.locks
-        ? await navigator.locks.request(savedDealsKey, write)
-        : write();
-      setSavedDeals(next);
+      setSavedDeals(updateSavedDeal(localStorage, deal, !exists));
       setNotice(
         exists
           ? "Removed from saved finds"
@@ -389,8 +382,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           ? "Removed for this visit. Browser storage is unavailable."
           : "Saved for this visit. Browser storage is unavailable.",
       );
-    } finally {
-      pendingSaves.current.delete(deal.id);
     }
   }
   function navigateSaved(saved: boolean) {

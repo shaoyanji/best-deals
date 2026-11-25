@@ -1,6 +1,8 @@
 import { categories, type Deal } from "./types";
 
 export const savedDealsKey = "bestdeals:saved:v1";
+export const savedDealPrefix = "bestdeals:saved:v2:";
+type SavedStorage = Pick<Storage, "getItem" | "setItem" | "key" | "length">;
 
 function httpsUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -51,17 +53,38 @@ export function parseSavedDeals(raw: string | null): Deal[] {
     .filter((d, i, all) => all.findIndex((other) => other.id === d.id) === i);
 }
 
-// Read immediately before writing, not from a tab's potentially stale React state.
+export function readSavedDeals(storage: SavedStorage): Deal[] {
+  const deals = new Map(
+    parseSavedDeals(storage.getItem(savedDealsKey)).map((d) => [d.id, d]),
+  );
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (!key?.startsWith(savedDealPrefix)) continue;
+    try {
+      const id = decodeURIComponent(key.slice(savedDealPrefix.length));
+      const record: unknown = JSON.parse(storage.getItem(key) ?? "null");
+      if (record === null) deals.delete(id);
+      else if (isDeal(record) && record.id === id) deals.set(id, record);
+    } catch {
+      // One malformed record must not hide the rest of the shortlist.
+    }
+  }
+  return [...deals.values()];
+}
+
+// Each operation writes exactly one key. Even serialized localStorage reads
+// can be stale in another renderer, so never rewrite the entire collection.
+// Tombstones override legacy array entries without resurrecting removed finds.
 export function updateSavedDeal(
-  storage: Pick<Storage, "getItem" | "setItem">,
+  storage: SavedStorage,
   deal: Deal,
   save: boolean,
 ) {
-  const current = parseSavedDeals(storage.getItem(savedDealsKey));
-  const others = current.filter((d) => d.id !== deal.id);
-  const deals = save ? [...others, deal] : others;
-  storage.setItem(savedDealsKey, JSON.stringify(deals));
-  return deals;
+  storage.setItem(
+    savedDealPrefix + encodeURIComponent(deal.id),
+    JSON.stringify(save ? deal : null),
+  );
+  return readSavedDeals(storage);
 }
 
 export type SavedAvailability = "expired" | "unlisted" | null;
