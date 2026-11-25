@@ -51,6 +51,18 @@ test("uses precise structured prices rather than rounded title amounts", () => {
   assert.equal(offer.price, null);
 });
 
+test("dollar savings and trade-in credits are not purchase prices", () => {
+  const title =
+    "<title>Samsung Galaxy Phone Black Friday Deals: Up to $800 off w/ trade-in + free shipping</title>";
+  assert.equal(parseFeed(rss(title), sources[2], now)[0].price, null);
+  assert.equal(parseFeed(rss(title), sources[0], now)[0].price, null);
+  assert.equal(
+    parseFeed(rss("<title>Headphones $20 off</title>"), sources[0], now)[0]
+      .price,
+    null,
+  );
+});
+
 test("omits expired and old offers, and unsafe external URLs", () => {
   assert.equal(
     parseFeed(

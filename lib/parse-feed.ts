@@ -126,7 +126,10 @@ export function parseFeed(
     const parsedPrice =
       Number.isFinite(structuredPrice) && structuredPrice > 0
         ? structuredPrice
-        : /\b(?:save|extra|take)\s+\$/i.test(priceText)
+        : source.name === "DealNews" ||
+            /\b(?:up to|save|extra|take)\s+[$£]|[$£]\s*[\d,.]+\s*(?:off|cashback|credit|coupon|gift card|shipping)/i.test(
+              priceText,
+            )
           ? null
           : priceMatch
             ? Number(priceMatch[1].replace(/,/g, ""))
