@@ -33,6 +33,13 @@ import {
   type Region,
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
+import {
+  parseSavedDeals,
+  savedAvailability,
+  savedDealsKey,
+  updateSavedDeal,
+  type SavedAvailability,
+} from "@/lib/saved-deals";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
 const money = (deal: Deal) =>
@@ -84,11 +91,13 @@ function ProductImage({
 
 function DealCard({
   deal,
+  availability,
   saved,
   toggle,
   open,
 }: {
   deal: Deal;
+  availability: SavedAvailability;
   saved: boolean;
   toggle: (d: Deal) => void;
   open: (d: Deal) => void;
@@ -103,10 +112,16 @@ function DealCard({
         >
           <ProductImage deal={deal} />
         </button>
-        <span className={`deal-badge ${deal.discount ? "discount" : ""}`}>
-          {deal.discount
-            ? `${deal.upTo ? "Up to " : ""}${deal.discount}% off`
-            : deal.category}
+        <span
+          className={`deal-badge ${!availability && deal.discount ? "discount" : ""}`}
+        >
+          {availability === "expired"
+            ? "Expired"
+            : availability === "unlisted"
+              ? "Not in latest feed"
+              : deal.discount
+                ? `${deal.upTo ? "Up to " : ""}${deal.discount}% off`
+                : deal.category}
         </span>
         <button
           className={`save-button ${saved ? "is-saved" : ""}`}
@@ -128,9 +143,22 @@ function DealCard({
         <div className="card-price">
           <strong>{money(deal) ?? "See offer"}</strong>
           <span>
-            {deal.discount ? "Listed discount" : "Source-listed offer"}
+            {availability
+              ? deal.price === null
+                ? "Saved listing"
+                : "Last listed price"
+              : deal.discount
+                ? "Listed discount"
+                : "Source-listed offer"}
           </span>
         </div>
+        {availability && (
+          <p className="saved-status">
+            {availability === "expired"
+              ? "This offer has expired. Kept here for reference."
+              : "Availability unknown. Check the original listing."}
+          </p>
+        )}
         <div className="card-bottom">
           <span suppressHydrationWarning>
             {deal.source} <span className="muted-dot">·</span>{" "}
@@ -152,11 +180,13 @@ function DealCard({
 
 function DealDialog({
   deal,
+  availability,
   close,
   saved,
   toggle,
 }: {
   deal: Deal;
+  availability: SavedAvailability;
   close: () => void;
   saved: boolean;
   toggle: (deal: Deal) => void;
@@ -190,6 +220,13 @@ function DealDialog({
           {deal.merchant} <span> / </span> {deal.region} deal
         </div>
         <h2 id="deal-title">{deal.title}</h2>
+        {availability && (
+          <p className="feed-warning" role="status">
+            {availability === "expired"
+              ? "Expired offer. This saved listing is kept for reference; its price is no longer current."
+              : "Not in the latest feed. This saved listing may have changed or expired; its price was last seen when listed."}
+          </p>
+        )}
         <div className="dialog-price">
           {money(deal) ?? "See offer at source"}
         </div>
@@ -210,10 +247,15 @@ function DealDialog({
           target="_blank"
           rel="noopener noreferrer"
         >
-          View deal on {deal.source}
+          {availability ? "Check original listing on" : "View deal on"}{" "}
+          {deal.source}
           <ArrowUpRight size={18} />
         </a>
-        <button className="secondary" onClick={() => toggle(deal)}>
+        <button
+          className="secondary"
+          aria-pressed={saved}
+          onClick={() => toggle(deal)}
+        >
           <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved to your finds" : "Save for later"}
         </button>
@@ -231,33 +273,50 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [savedDeals, setSavedDeals] = useState<Deal[]>([]);
   const [savedLoaded, setSavedLoaded] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
+  const [now, setNow] = useState(0);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
+  const visitOnly = useRef(false);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(
-        localStorage.getItem("bestdeals:saved:v1") ?? "[]",
-      );
-      if (Array.isArray(stored))
-        setSavedDeals(
-          stored.filter(
-            (d: Deal) =>
-              d &&
-              typeof d.id === "string" &&
-              typeof d.title === "string" &&
-              typeof d.url === "string" &&
-              d.url.startsWith("https://"),
-          ),
-        );
-    } catch {
-      /* Unavailable storage does not prevent browsing. */
+    function syncSaved() {
+      try {
+        if (!visitOnly.current)
+          setSavedDeals(parseSavedDeals(localStorage.getItem(savedDealsKey)));
+      } catch {
+        // Preserve visit-only saves when storage is unavailable or unreadable.
+      }
+      setSavedLoaded(true);
+      setNow(Date.now());
     }
-    setSavedLoaded(true);
+    function storageChanged(event: StorageEvent) {
+      if (
+        event.storageArea === localStorage &&
+        (event.key === savedDealsKey || event.key === null)
+      )
+        syncSaved();
+    }
+    function syncView() {
+      setSavedOnly(window.location.hash === "#saved");
+    }
+    syncSaved();
+    syncView();
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    window.addEventListener("storage", storageChanged);
+    window.addEventListener("focus", syncSaved);
+    window.addEventListener("hashchange", syncView);
+    window.addEventListener("popstate", syncView);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", storageChanged);
+      window.removeEventListener("focus", syncSaved);
+      window.removeEventListener("hashchange", syncView);
+      window.removeEventListener("popstate", syncView);
+    };
   }, []);
   useEffect(() => {
     setPage(1);
@@ -273,17 +332,27 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     const next = exists
       ? savedDeals.filter((d) => d.id !== deal.id)
       : [...savedDeals, deal];
-    setSavedDeals(next);
     try {
-      localStorage.setItem("bestdeals:saved:v1", JSON.stringify(next));
+      if (visitOnly.current) throw new Error("Visit-only saves");
+      setSavedDeals(updateSavedDeal(localStorage, deal, !exists));
       setNotice(
         exists
           ? "Removed from saved finds"
           : "Saved. A good find worth keeping.",
       );
     } catch {
-      setNotice("Saved for this visit. Browser storage is unavailable.");
+      visitOnly.current = true;
+      setSavedDeals(next);
+      setNotice(
+        exists
+          ? "Removed for this visit. Browser storage is unavailable."
+          : "Saved for this visit. Browser storage is unavailable.",
+      );
     }
+  }
+  function navigateSaved(saved: boolean) {
+    setSavedOnly(saved);
+    window.history.pushState(null, "", saved ? "#saved" : "#finds");
   }
   async function refresh() {
     setRefreshing(true);
@@ -332,7 +401,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             <button
               className={!savedOnly ? "nav-active" : ""}
               onClick={() => {
-                setSavedOnly(false);
+                navigateSaved(false);
                 clear();
               }}
             >
@@ -341,7 +410,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             <button
               className={savedOnly ? "nav-active" : ""}
               onClick={() => {
-                setSavedOnly(true);
+                navigateSaved(true);
                 clear();
                 resultsRef.current?.scrollIntoView({ behavior: "smooth" });
               }}
@@ -558,7 +627,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           {savedOnly && (
             <p className="saved-explainer">
               A little shortlist for later. Saved on this browser, no account
-              needed. Older finds may have expired.
+              needed. Listings stay saved even after leaving the latest feed.
             </p>
           )}
           <div aria-live="polite" className="sr-only">
@@ -570,6 +639,9 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 <DealCard
                   key={deal.id}
                   deal={deal}
+                  availability={
+                    savedOnly ? savedAvailability(deal, feed.deals, now) : null
+                  }
                   saved={savedIds.includes(deal.id)}
                   toggle={toggle}
                   open={setActiveDeal}
@@ -596,7 +668,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 onClick={() => {
                   clear();
                   if (!feed.deals.length && !savedOnly) void refresh();
-                  else setSavedOnly(false);
+                  else navigateSaved(false);
                 }}
               >
                 {!feed.deals.length && !savedOnly
@@ -673,7 +745,12 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
       </footer>
       {activeDeal && (
         <DealDialog
-          deal={activeDeal}
+          deal={feed.deals.find((d) => d.id === activeDeal.id) ?? activeDeal}
+          availability={savedAvailability(
+            feed.deals.find((d) => d.id === activeDeal.id) ?? activeDeal,
+            feed.deals,
+            now,
+          )}
           saved={savedIds.includes(activeDeal.id)}
           toggle={toggle}
           close={() => setActiveDeal(null)}
