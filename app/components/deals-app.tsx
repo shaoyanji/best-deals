@@ -34,7 +34,11 @@ import {
   type Region,
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
-import { readBrowseState, writeBrowseState } from "@/lib/browse-state";
+import {
+  readBrowseState,
+  writeBrowseState,
+  type BrowseState,
+} from "@/lib/browse-state";
 import { refreshFeed } from "@/lib/refresh-feed";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
@@ -255,15 +259,21 @@ function DealDialog({
   );
 }
 
-export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
+export default function DealsApp({
+  initialFeed,
+  initialBrowse,
+}: {
+  initialFeed: Feed;
+  initialBrowse: BrowseState;
+}) {
   const [feed, setFeed] = useState(initialFeed);
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<Category>("All finds");
-  const [region, setRegion] = useState<Region>("all");
-  const [sort, setSort] = useState<Sort>("recent");
+  const [query, setQuery] = useState(initialBrowse.query);
+  const [category, setCategory] = useState<Category>(initialBrowse.category);
+  const [region, setRegion] = useState<Region>(initialBrowse.region);
+  const [sort, setSort] = useState<Sort>(initialBrowse.sort);
   const [savedDeals, setSavedDeals] = useState<Deal[]>([]);
   const [savedLoaded, setSavedLoaded] = useState(false);
-  const [savedOnly, setSavedOnly] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(initialBrowse.savedOnly);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
@@ -698,7 +708,11 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           <div aria-live="polite" className="sr-only">
             {filtered.length} deals found
           </div>
-          {filtered.length ? (
+          {savedOnly && !savedLoaded ? (
+            <p className="saved-explainer" role="status">
+              Loading your saved finds…
+            </p>
+          ) : filtered.length ? (
             <div className="deals-grid">
               {filtered.slice(0, page * 16).map((deal) => (
                 <DealCard
