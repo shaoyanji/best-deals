@@ -1436,11 +1436,13 @@ h1 > span {
     padding: 8px 0;
   }
   .categories {
+    flex-wrap: wrap;
     padding: 16px 0 21px;
     gap: 7px;
   }
   .categories button {
-    font-size: 10px;
+    font-size: 12px;
+    min-height: 44px;
     padding: 9px 12px;
   }
   .categories svg {

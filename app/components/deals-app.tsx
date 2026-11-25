@@ -34,6 +34,7 @@ import {
   type Region,
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
+import { readBrowseState, writeBrowseState } from "@/lib/browse-state";
 import { refreshFeed } from "@/lib/refresh-feed";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
@@ -270,6 +271,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const refreshPending = useRef(false);
   const [browsingLoaded, setBrowsingLoaded] = useState(false);
   const [notice, setNotice] = useState("");
+  const [browseLoaded, setBrowseLoaded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const resultsTitleRef = useRef<HTMLHeadingElement>(null);
   const previousView = useRef(savedOnly);
@@ -278,6 +280,56 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     if (previousView.current !== savedOnly) resultsTitleRef.current?.focus();
     previousView.current = savedOnly;
   }, [savedOnly]);
+
+  useEffect(() => {
+    const restore = () => {
+      const state = readBrowseState(window.location.search);
+      setQuery(state.query);
+      setCategory(state.category);
+      setRegion(state.region);
+      setSort(state.sort);
+      setSavedOnly(state.savedOnly);
+      setBrowseLoaded(true);
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    if (!browseLoaded) return;
+    const search = writeBrowseState(window.location.search, {
+      query,
+      category,
+      region,
+      sort,
+      savedOnly,
+    });
+    const url = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+    window.history.replaceState(window.history.state, "", url);
+  }, [browseLoaded, query, category, region, sort, savedOnly]);
+  useEffect(() => {
+    const restoreDialog = () => {
+      const id = window.history.state?.bestdealsDeal;
+      setActiveDeal(
+        [...feed.deals, ...savedDeals].find((deal) => deal.id === id) ?? null,
+      );
+    };
+    restoreDialog();
+    window.addEventListener("popstate", restoreDialog);
+    return () => window.removeEventListener("popstate", restoreDialog);
+  }, [feed.deals, savedDeals]);
+
+  function openDeal(deal: Deal) {
+    window.history.pushState(
+      { ...window.history.state, bestdealsDeal: deal.id },
+      "",
+    );
+    setActiveDeal(deal);
+  }
+  function closeDeal() {
+    if (window.history.state?.bestdealsDeal) window.history.back();
+    else setActiveDeal(null);
+  }
 
   useEffect(() => {
     try {
@@ -497,7 +549,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             {featured ? (
               <button
                 className="feature-card"
-                onClick={() => setActiveDeal(featured)}
+                onClick={() => openDeal(featured)}
               >
                 <div className="feature-top">
                   <span>THE GOOD FIND EDIT</span>
@@ -692,7 +744,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                   deal={deal}
                   saved={savedIds.includes(deal.id)}
                   toggle={toggle}
-                  open={setActiveDeal}
+                  open={openDeal}
                 />
               ))}
             </div>
@@ -809,7 +861,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           deal={activeDeal}
           saved={savedIds.includes(activeDeal.id)}
           toggle={toggle}
-          close={() => setActiveDeal(null)}
+          close={closeDeal}
         />
       )}
       {notice && (
