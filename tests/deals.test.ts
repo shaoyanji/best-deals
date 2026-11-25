@@ -176,3 +176,32 @@ test("unknown prices and discounts sort after explicit values", () => {
     30,
   );
 });
+
+test("equal and missing sort values use newest first across source batches", () => {
+  const [base] = parseFeed(
+    rss("<title>Furniture sale</title>"),
+    sources[2],
+    now,
+  );
+  const older = { ...base, id: "older", publishedAt: "2026-11-25T10:00:00Z" };
+  const newer = { ...base, id: "newer", publishedAt: "2026-11-25T11:00:00Z" };
+  for (const sort of ["price", "discount"] as const) {
+    assert.deepEqual(
+      filterDeals([older, newer], "", "All finds", "US", sort).map((d) => d.id),
+      ["newer", "older"],
+    );
+    assert.deepEqual(
+      filterDeals(
+        [
+          { ...older, price: 25, discount: 20 },
+          { ...newer, price: 25, discount: 20 },
+        ],
+        "",
+        "All finds",
+        "US",
+        sort,
+      ).map((d) => d.id),
+      ["newer", "older"],
+    );
+  }
+});

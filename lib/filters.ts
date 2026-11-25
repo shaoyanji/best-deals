@@ -22,10 +22,16 @@ export function filterDeals(
         ),
     )
     .sort((a, b) => {
-      if (sort === "discount") return (b.discount ?? -1) - (a.discount ?? -1);
+      if (sort === "discount") {
+        const difference = (b.discount ?? -1) - (a.discount ?? -1);
+        if (difference) return difference;
+      }
       // A mixed-currency price sort is intentionally not offered by the UI.
-      if (sort === "price")
-        return (a.price ?? Infinity) - (b.price ?? Infinity);
+      if (sort === "price") {
+        const difference = (a.price ?? Infinity) - (b.price ?? Infinity);
+        if (difference) return difference;
+      }
+      // Equal or missing values stay useful even when sources arrive in batches.
       return Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
     });
 }
