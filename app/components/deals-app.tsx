@@ -269,7 +269,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const refreshPending = useRef(false);
-  const [browsingLoaded, setBrowsingLoaded] = useState(false);
   const [notice, setNotice] = useState("");
   const [browseLoaded, setBrowseLoaded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -330,43 +329,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     if (window.history.state?.bestdealsDeal) window.history.back();
     else setActiveDeal(null);
   }
-
-  useEffect(() => {
-    try {
-      const state = JSON.parse(
-        sessionStorage.getItem("bestdeals:browsing:v1") ?? "null",
-      );
-      if (state && typeof state === "object") {
-        if (typeof state.query === "string") setQuery(state.query);
-        if (categories.includes(state.category)) setCategory(state.category);
-        const nextRegion = ["all", "US", "UK"].includes(state.region)
-          ? state.region
-          : "all";
-        setRegion(nextRegion);
-        if (["recent", "discount", "price"].includes(state.sort))
-          setSort(
-            state.sort === "price" && nextRegion === "all"
-              ? "recent"
-              : state.sort,
-          );
-        if (typeof state.savedOnly === "boolean") setSavedOnly(state.savedOnly);
-      }
-    } catch {
-      /* Corrupt or unavailable storage does not prevent browsing. */
-    }
-    setBrowsingLoaded(true);
-  }, []);
-  useEffect(() => {
-    if (!browsingLoaded) return;
-    try {
-      sessionStorage.setItem(
-        "bestdeals:browsing:v1",
-        JSON.stringify({ query, category, region, sort, savedOnly }),
-      );
-    } catch {
-      /* Filters still work when browser storage is unavailable. */
-    }
-  }, [browsingLoaded, query, category, region, sort, savedOnly]);
 
   useEffect(() => {
     try {
