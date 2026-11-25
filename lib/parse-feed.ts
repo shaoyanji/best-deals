@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
 import he from "he";
-import type { Category, Deal } from "./types";
+import { currencies, type Category, type Deal } from "./types";
 
 export const sources = [
   {
@@ -15,6 +15,17 @@ export const sources = [
     url: "https://www.hotukdeals.com/rss/hot",
   },
   { name: "DealNews", region: "US", url: "https://www.dealnews.com/?rss=1" },
+  {
+    name: "Schnäppchenfuchs",
+    region: "DE",
+    url: "https://schnaeppchenfuchs.com/rss",
+  },
+  { name: "DealDoktor", region: "DE", url: "https://www.dealdoktor.de/feed/" },
+  {
+    name: "DealDoktor Community",
+    region: "DE",
+    url: "https://www.dealdoktor.de/user-deals/feed/",
+  },
 ] as const;
 type Source = (typeof sources)[number];
 
@@ -32,6 +43,18 @@ function safeUrl(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function isInStore(title: string, description: string): boolean {
+  return (
+    /\[lokal\]|\(lokal\)/i.test(title) ||
+    /(?<!nicht )\bnur (?:vor Ort|in (?:der|den|teilnehmenden) Filialen?)\b/i.test(
+      `${title} ${description}`,
+    ) ||
+    /(?:^|[.!?]\s+)gültig in (?:allen|teilnehmenden) Filialen\b|\bin einigen (?:[\p{L}\p{N}-]+-)?Einrichtungshäusern\b/iu.test(
+      description,
+    )
+  );
 }
 
 export function categorize(text: string): Category {
@@ -114,7 +137,7 @@ export function parseFeed(
         description.match(/^([\w .!'&-]{2,32}) has\b/)?.[1] ??
         source.name,
     );
-    const currency = source.region === "UK" ? "GBP" : "USD";
+    const currency = currencies[source.region];
     // Prose mixes prices, discounts, trade-ins and shipping. Only use a
     // dedicated structured price field; otherwise send readers to the source.
     const ukPrice = String(item["pepper:merchant"]?.["@_price"] ?? "").match(
@@ -149,6 +172,9 @@ export function parseFeed(
         merchant,
         region: source.region,
         currency,
+        ...(source.region === "DE" && isInStore(title, description)
+          ? { inStore: true }
+          : {}),
         price: parsedPrice !== null && parsedPrice > 0 ? parsedPrice : null,
         discount: discountMatch ? Number(discountMatch[2]) : null,
         upTo: Boolean(discountMatch?.[1]),

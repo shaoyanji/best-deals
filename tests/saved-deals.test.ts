@@ -40,6 +40,36 @@ function storage() {
   };
 }
 
+test("German listings and in-store labels survive saving", () => {
+  const shared = storage();
+  const germanListings = [
+    {
+      ...deal,
+      id: "fuchs",
+      source: "Schnäppchenfuchs",
+      region: "DE",
+      currency: "EUR",
+    },
+    {
+      ...deal,
+      id: "doktor",
+      source: "DealDoktor",
+      region: "DE",
+      currency: "EUR",
+    },
+    {
+      ...deal,
+      id: "community",
+      source: "DealDoktor Community",
+      region: "DE",
+      currency: "EUR",
+      inStore: true,
+    },
+  ] satisfies Deal[];
+  for (const listing of germanListings) updateSavedDeal(shared, listing, true);
+  assert.deepEqual(readSavedDeals(shared), germanListings);
+});
+
 test("a stale tab saving a different listing does not resurrect a removed find", () => {
   const shared = storage();
   const tabOne = updateSavedDeal(shared, deal, true);

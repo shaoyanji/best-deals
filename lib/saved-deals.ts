@@ -1,4 +1,4 @@
-import { categories, type Deal } from "./types";
+import { categories, currencies, type Deal } from "./types";
 
 export const savedDealsKey = "bestdeals:saved:v1";
 export const savedDealPrefix = "bestdeals:saved:v2:";
@@ -25,9 +25,18 @@ function isDeal(value: unknown): value is Deal {
     typeof d.merchant === "string" &&
     httpsUrl(d.url) &&
     (d.image === null || httpsUrl(d.image)) &&
-    ["Slickdeals", "HotUKDeals", "DealNews"].includes(d.source as string) &&
-    ["US", "UK"].includes(d.region as string) &&
-    ["USD", "GBP"].includes(d.currency as string) &&
+    [
+      "Slickdeals",
+      "HotUKDeals",
+      "DealNews",
+      "Schnäppchenfuchs",
+      "DealDoktor",
+      "DealDoktor Community",
+    ].includes(d.source as string) &&
+    typeof d.region === "string" &&
+    Object.hasOwn(currencies, d.region) &&
+    (Object.values(currencies) as string[]).includes(d.currency as string) &&
+    (d.inStore === undefined || d.inStore === true) &&
     categories.includes(d.category as Deal["category"]) &&
     numberOrNull(d.price) &&
     numberOrNull(d.discount) &&
