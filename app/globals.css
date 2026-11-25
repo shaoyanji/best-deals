@@ -736,6 +736,20 @@ h1 > span {
 .primary:hover {
   background: #3c5131;
 }
+.refresh-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.refresh-status > span {
+  flex: 1 1 200px;
+}
+.refresh-status .secondary {
+  color: inherit;
+}
 .feed-footer {
   display: flex;
   justify-content: space-between;
