@@ -315,6 +315,8 @@ export default function DealsApp({
   const [savedOnly, setSavedOnly] = useState(initialBrowse.savedOnly);
   const [now, setNow] = useState(0);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  // History entries must still resolve after a stale listing is unsaved.
+  const openedDeals = useRef(new Map<string, Deal>());
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
@@ -361,7 +363,9 @@ export default function DealsApp({
     const restoreDialog = () => {
       const id = window.history.state?.bestdealsDeal;
       setActiveDeal(
-        [...feed.deals, ...savedDeals].find((deal) => deal.id === id) ?? null,
+        [...feed.deals, ...savedDeals].find((deal) => deal.id === id) ??
+          openedDeals.current.get(id) ??
+          null,
       );
     };
     restoreDialog();
@@ -370,6 +374,7 @@ export default function DealsApp({
   }, [feed.deals, savedDeals]);
 
   function openDeal(deal: Deal) {
+    openedDeals.current.set(deal.id, deal);
     window.history.pushState(
       { ...window.history.state, bestdealsDeal: deal.id },
       "",
