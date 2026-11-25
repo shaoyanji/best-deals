@@ -549,6 +549,9 @@ h1 > span {
   padding: 0;
   display: block;
 }
+.image-button:focus-visible {
+  outline-offset: -5px;
+}
 .product-image {
   height: 100%;
   display: flex;
@@ -636,7 +639,6 @@ h1 > span {
 .card-content h3 {
   margin-top: 9px;
   height: 53px;
-  overflow: hidden;
 }
 .card-content h3 button {
   padding: 0;
@@ -737,6 +739,20 @@ h1 > span {
 }
 .primary:hover {
   background: #3c5131;
+}
+.refresh-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.refresh-status > span {
+  flex: 1 1 200px;
+}
+.refresh-status .secondary {
+  color: inherit;
 }
 .feed-footer {
   display: flex;
@@ -1426,11 +1442,13 @@ h1 > span {
     padding: 8px 0;
   }
   .categories {
+    flex-wrap: wrap;
     padding: 16px 0 21px;
     gap: 7px;
   }
   .categories button {
-    font-size: 10px;
+    font-size: 12px;
+    min-height: 44px;
     padding: 9px 12px;
   }
   .categories svg {
