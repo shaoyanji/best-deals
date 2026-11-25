@@ -7,8 +7,8 @@ test("a stalled refresh aborts and a new request can recover", async (t) => {
   const fetchMock = t.mock.method(
     globalThis,
     "fetch",
-    async (_url, options) => {
-      stalledSignal = options.signal;
+    async (_url: string | URL | Request, options?: RequestInit) => {
+      stalledSignal = options!.signal!;
       return new Promise<Response>((_resolve, reject) => {
         stalledSignal!.addEventListener("abort", () =>
           reject(stalledSignal!.reason),
@@ -31,18 +31,22 @@ test("a stalled refresh aborts and a new request can recover", async (t) => {
 });
 
 test("the timeout also bounds a response body that never finishes", async (t) => {
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    return new Response(
-      new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('{"deals":['));
-          options.signal.addEventListener("abort", () =>
-            controller.error(options.signal.reason),
-          );
-        },
-      }),
-    );
-  });
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: string | URL | Request, options?: RequestInit) => {
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"deals":['));
+            options!.signal!.addEventListener("abort", () =>
+              controller.error(options!.signal!.reason),
+            );
+          },
+        }),
+      );
+    },
+  );
   await assert.rejects(refreshFeed(20), /connection is taking too long/);
 });
 
