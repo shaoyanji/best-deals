@@ -897,6 +897,12 @@ h1 > span {
   margin-bottom: 20px;
   color: var(--muted);
 }
+.saved-status {
+  margin: 8px 0;
+  color: #746239;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .feed-warning {
   border-radius: 7px;
   background: #fff6dc;
