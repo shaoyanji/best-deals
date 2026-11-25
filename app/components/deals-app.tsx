@@ -198,9 +198,10 @@ function DealDialog({
     dialog?.showModal();
     return () => {
       dialog?.close();
-      const target = opener instanceof HTMLElement && opener.isConnected
-        ? opener
-        : document.getElementById("results-title");
+      const target =
+        opener instanceof HTMLElement && opener.isConnected
+          ? opener
+          : document.getElementById("results-title");
       target?.focus();
     };
   }, []);
@@ -305,6 +306,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const visitOnly = useRef(false);
+  const pendingSaves = useRef(new Set<string>());
   const resultsTitleRef = useRef<HTMLHeadingElement>(null);
   const previousView = useRef(savedOnly);
 
@@ -358,14 +360,19 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  function toggle(deal: Deal) {
+  async function toggle(deal: Deal) {
+    if (pendingSaves.current.has(deal.id)) return;
+    pendingSaves.current.add(deal.id);
     const exists = savedDeals.some((d) => d.id === deal.id);
-    const next = exists
-      ? savedDeals.filter((d) => d.id !== deal.id)
-      : [...savedDeals, deal];
     try {
       if (visitOnly.current) throw new Error("Visit-only saves");
-      setSavedDeals(updateSavedDeal(localStorage, deal, !exists));
+      // A localStorage read/write pair is not atomic across browser tabs.
+      // Hold the same-origin lock until the full mutation has persisted.
+      const write = () => updateSavedDeal(localStorage, deal, !exists);
+      const next = navigator.locks
+        ? await navigator.locks.request(savedDealsKey, write)
+        : write();
+      setSavedDeals(next);
       setNotice(
         exists
           ? "Removed from saved finds"
@@ -373,12 +380,17 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
       );
     } catch {
       visitOnly.current = true;
-      setSavedDeals(next);
+      setSavedDeals((current) => {
+        const others = current.filter((d) => d.id !== deal.id);
+        return exists ? others : [...others, deal];
+      });
       setNotice(
         exists
           ? "Removed for this visit. Browser storage is unavailable."
           : "Saved for this visit. Browser storage is unavailable.",
       );
+    } finally {
+      pendingSaves.current.delete(deal.id);
     }
   }
   function navigateSaved(saved: boolean) {
