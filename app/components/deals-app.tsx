@@ -166,14 +166,40 @@ function DealDialog({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const opener = document.activeElement;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      const target =
+        opener instanceof HTMLElement && opener.isConnected
+          ? opener
+          : document.getElementById("results-title");
+      target?.focus();
+    };
   }, []);
   return (
     <dialog
       ref={ref}
       className="deal-dialog"
-      onCancel={close}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = event.currentTarget.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], [tabindex="0"]',
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}
@@ -215,9 +241,13 @@ function DealDialog({
           View deal on {deal.source}
           <ArrowUpRight size={18} />
         </a>
-        <button className="secondary" onClick={() => toggle(deal)}>
+        <button
+          className="secondary"
+          onClick={() => toggle(deal)}
+          aria-pressed={saved}
+        >
           <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
-          {saved ? "Saved to your finds" : "Save for later"}
+          {saved ? "Remove from saved finds" : "Save for later"}
         </button>
       </div>
     </dialog>
@@ -241,7 +271,13 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [browsingLoaded, setBrowsingLoaded] = useState(false);
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const resultsRef = useRef<HTMLElement>(null);
+  const resultsTitleRef = useRef<HTMLHeadingElement>(null);
+  const previousView = useRef(savedOnly);
+
+  useEffect(() => {
+    if (previousView.current !== savedOnly) resultsTitleRef.current?.focus();
+    previousView.current = savedOnly;
+  }, [savedOnly]);
 
   useEffect(() => {
     try {
@@ -353,6 +389,16 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     ? savedDeals.map((d) => feed.deals.find((f) => f.id === d.id) ?? d)
     : feed.deals;
   const filtered = filterDeals(allDeals, query, category, region, sort);
+  const pricedCount = filtered.filter((deal) => deal.price !== null).length;
+  const hasSearchFilters = query.trim() !== "" || category !== "All finds";
+  const sortHelp =
+    region === "all"
+      ? "Choose one region to sort by price. US and UK currencies are not converted."
+      : !pricedCount
+        ? "Price sorting is unavailable for these results: the sources have not provided sortable prices. Check each source for the current price."
+        : sort === "price"
+          ? `${pricedCount} of ${filtered.length} finds have sortable prices. Finds without a price appear last. Confirm current prices at the source.`
+          : "";
   const featured =
     feed.deals.find((d) => d.image && d.category === "Tech") ??
     feed.deals.find((d) => d.image);
@@ -377,6 +423,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           <nav aria-label="Main navigation">
             <button
               className={!savedOnly ? "nav-active" : ""}
+              aria-current={!savedOnly ? "page" : undefined}
               onClick={() => {
                 setSavedOnly(false);
                 clear();
@@ -386,10 +433,10 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
             </button>
             <button
               className={savedOnly ? "nav-active" : ""}
+              aria-current={savedOnly ? "page" : undefined}
               onClick={() => {
                 setSavedOnly(true);
                 clear();
-                resultsRef.current?.scrollIntoView({ behavior: "smooth" });
               }}
             >
               <Bookmark size={16} />
@@ -489,7 +536,6 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
         <section
           className="browse-section wrap"
           id="finds"
-          ref={resultsRef}
           aria-labelledby="results-title"
         >
           <div className="search-row">
@@ -556,7 +602,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               <div className="section-kicker">
                 A LITTLE DISCOVERY GOES A LONG WAY
               </div>
-              <h2 id="results-title">
+              <h2 id="results-title" ref={resultsTitleRef} tabIndex={-1}>
                 {savedOnly
                   ? "Your saved finds"
                   : query.trim()
@@ -581,13 +627,18 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 <SlidersHorizontal size={15} />
                 <select
                   aria-label="Sort deals"
+                  aria-describedby={sortHelp ? "sort-help" : undefined}
                   value={sort}
                   onChange={(e) => setSort(e.target.value as Sort)}
                 >
                   <option value="recent">Newest first</option>
                   <option value="discount">Biggest % off</option>
                   {region !== "all" && (
-                    <option value="price">Price: low to high</option>
+                    <option value="price" disabled={!pricedCount}>
+                      {pricedCount
+                        ? "Price: low to high"
+                        : "Price: unavailable"}
+                    </option>
                   )}
                 </select>
                 <ChevronDown size={14} />
@@ -612,6 +663,11 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               </button>
             </div>
           ) : null}
+          {sortHelp && (
+            <p id="sort-help" className="saved-explainer" role="status">
+              {sortHelp}
+            </p>
+          )}
           {feed.stale && !savedOnly && (
             <div className="feed-warning">
               {feed.unavailableSources.join(", ")}{" "}
@@ -659,14 +715,22 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 className="primary"
                 disabled={refreshing && !feed.deals.length && !savedOnly}
                 onClick={() => {
-                  clear();
                   if (!feed.deals.length && !savedOnly) void refresh();
-                  else setSavedOnly(false);
+                  else if (hasSearchFilters) {
+                    setQuery("");
+                    setCategory("All finds");
+                    searchRef.current?.focus();
+                  } else if (savedOnly) setSavedOnly(false);
+                  else void refresh();
                 }}
               >
                 {!feed.deals.length && !savedOnly
                   ? "Try refreshing"
-                  : "Explore all finds"}
+                  : hasSearchFilters
+                    ? "Clear search and category"
+                    : savedOnly
+                      ? "Explore all finds"
+                      : "Try refreshing"}
                 <ArrowRight size={17} />
               </button>
             </div>
