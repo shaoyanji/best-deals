@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
+  AlertCircle,
   Bookmark,
   Check,
   ChevronDown,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/types";
 import { filterDeals, type Sort } from "@/lib/filters";
 import { readBrowseState, writeBrowseState } from "@/lib/browse-state";
+import { refreshFeed } from "@/lib/refresh-feed";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
 const money = (deal: Deal) =>
@@ -265,6 +267,9 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const refreshPending = useRef(false);
+  const [browsingLoaded, setBrowsingLoaded] = useState(false);
   const [notice, setNotice] = useState("");
   const [browseLoaded, setBrowseLoaded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -328,6 +333,43 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
 
   useEffect(() => {
     try {
+      const state = JSON.parse(
+        sessionStorage.getItem("bestdeals:browsing:v1") ?? "null",
+      );
+      if (state && typeof state === "object") {
+        if (typeof state.query === "string") setQuery(state.query);
+        if (categories.includes(state.category)) setCategory(state.category);
+        const nextRegion = ["all", "US", "UK"].includes(state.region)
+          ? state.region
+          : "all";
+        setRegion(nextRegion);
+        if (["recent", "discount", "price"].includes(state.sort))
+          setSort(
+            state.sort === "price" && nextRegion === "all"
+              ? "recent"
+              : state.sort,
+          );
+        if (typeof state.savedOnly === "boolean") setSavedOnly(state.savedOnly);
+      }
+    } catch {
+      /* Corrupt or unavailable storage does not prevent browsing. */
+    }
+    setBrowsingLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!browsingLoaded) return;
+    try {
+      sessionStorage.setItem(
+        "bestdeals:browsing:v1",
+        JSON.stringify({ query, category, region, sort, savedOnly }),
+      );
+    } catch {
+      /* Filters still work when browser storage is unavailable. */
+    }
+  }, [browsingLoaded, query, category, region, sort, savedOnly]);
+
+  useEffect(() => {
+    try {
       const stored = JSON.parse(
         localStorage.getItem("bestdeals:saved:v1") ?? "[]",
       );
@@ -374,20 +416,24 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     }
   }
   async function refresh() {
+    if (refreshPending.current) return;
+    refreshPending.current = true;
     setRefreshing(true);
+    setNotice("");
     try {
-      const response = await fetch("/api/deals");
-      if (!response.ok) throw new Error("Refresh failed");
-      const next = (await response.json()) as Feed;
+      const next = await refreshFeed();
       setFeed(next);
-      setNotice(
-        next.stale
-          ? "Some sources are unavailable. Showing the latest we have."
-          : "You’re all caught up. Feeds refresh every 15 minutes.",
+      setRefreshError("");
+      if (!next.stale)
+        setNotice("You’re all caught up. Feeds refresh every 15 minutes.");
+    } catch (error) {
+      setRefreshError(
+        error instanceof Error && error.message.startsWith("The connection")
+          ? error.message
+          : "Couldn’t refresh. Check your connection and try again.",
       );
-    } catch {
-      setNotice("Couldn’t refresh. Your current finds are still here.");
     } finally {
+      refreshPending.current = false;
       setRefreshing(false);
     }
   }
@@ -395,6 +441,16 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     ? savedDeals.map((d) => feed.deals.find((f) => f.id === d.id) ?? d)
     : feed.deals;
   const filtered = filterDeals(allDeals, query, category, region, sort);
+  const pricedCount = filtered.filter((deal) => deal.price !== null).length;
+  const hasSearchFilters = query.trim() !== "" || category !== "All finds";
+  const sortHelp =
+    region === "all"
+      ? "Choose one region to sort by price. US and UK currencies are not converted."
+      : !pricedCount
+        ? "Price sorting is unavailable for these results: the sources have not provided sortable prices. Check each source for the current price."
+        : sort === "price"
+          ? `${pricedCount} of ${filtered.length} finds have sortable prices. Finds without a price appear last. Confirm current prices at the source.`
+          : "";
   const featured =
     feed.deals.find((d) => d.image && d.category === "Tech") ??
     feed.deals.find((d) => d.image);
@@ -601,7 +657,7 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               <h2 id="results-title" ref={resultsTitleRef} tabIndex={-1}>
                 {savedOnly
                   ? "Your saved finds"
-                  : query
+                  : query.trim()
                     ? "Your search results"
                     : category !== "All finds"
                       ? `${category} finds`
@@ -623,19 +679,47 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 <SlidersHorizontal size={15} />
                 <select
                   aria-label="Sort deals"
+                  aria-describedby={sortHelp ? "sort-help" : undefined}
                   value={sort}
                   onChange={(e) => setSort(e.target.value as Sort)}
                 >
                   <option value="recent">Newest first</option>
                   <option value="discount">Biggest % off</option>
                   {region !== "all" && (
-                    <option value="price">Price: low to high</option>
+                    <option value="price" disabled={!pricedCount}>
+                      {pricedCount
+                        ? "Price: low to high"
+                        : "Price: unavailable"}
+                    </option>
                   )}
                 </select>
                 <ChevronDown size={14} />
               </label>
             </div>
           </div>
+          {refreshing ? (
+            <p className="refresh-status" role="status">
+              Refreshing feeds… You can keep browsing your current finds.
+            </p>
+          ) : refreshError ? (
+            <div className="feed-warning refresh-status" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>
+                {refreshError}{" "}
+                {feed.deals.length
+                  ? "Your current finds are still here."
+                  : "No new listings could be loaded."}
+              </span>
+              <button className="secondary" onClick={refresh}>
+                Try again
+              </button>
+            </div>
+          ) : null}
+          {sortHelp && (
+            <p id="sort-help" className="saved-explainer" role="status">
+              {sortHelp}
+            </p>
+          )}
           {feed.stale && !savedOnly && (
             <div className="feed-warning">
               {feed.unavailableSources.join(", ")}{" "}
@@ -681,18 +765,24 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               </p>
               <button
                 className="primary"
+                disabled={refreshing && !feed.deals.length && !savedOnly}
                 onClick={() => {
-                  setQuery("");
-                  setCategory("All finds");
                   if (!feed.deals.length && !savedOnly) void refresh();
-                  else setSavedOnly(false);
+                  else if (hasSearchFilters) {
+                    setQuery("");
+                    setCategory("All finds");
+                    searchRef.current?.focus();
+                  } else if (savedOnly) setSavedOnly(false);
+                  else void refresh();
                 }}
               >
                 {!feed.deals.length && !savedOnly
                   ? "Try refreshing"
-                  : region === "all"
-                    ? "Explore all finds"
-                    : `Explore ${region} finds`}
+                  : hasSearchFilters
+                    ? "Clear search and category"
+                    : savedOnly
+                      ? "Explore all finds"
+                      : "Try refreshing"}
                 <ArrowRight size={17} />
               </button>
             </div>
@@ -714,7 +804,11 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
           <div className="feed-footer">
             <span>
               <span className="live-dot" />
-              {feed.stale ? "Latest available feeds" : "Fresh from the source"}
+              {refreshError
+                ? "Last refresh failed · showing previous update"
+                : feed.stale
+                  ? "Latest available feeds"
+                  : "Fresh from the source"}
             </span>
             <span>
               Checked{" "}
