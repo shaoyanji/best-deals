@@ -112,28 +112,23 @@ export function parseFeed(
         source.name,
     );
     const currency = source.region === "UK" ? "GBP" : "USD";
-    const priceText = String(
-      item["pepper:merchant"]?.["@_price"] ??
-        description.match(/\bfor\s+(?:just\s+)?(\$[\d,.]+)/i)?.[1] ??
-        title,
+    // Prose mixes prices, discounts, trade-ins and shipping. Only use a
+    // dedicated structured price field; otherwise send readers to the source.
+    const ukPrice = String(item["pepper:merchant"]?.["@_price"] ?? "").match(
+      /^£\s*([\d,]+(?:\.\d{1,2})?)$/,
     );
-    const priceMatch = priceText.match(
-      source.region === "UK"
-        ? /£\s*([\d,]+(?:\.\d{1,2})?)/
-        : /\$\s*([\d,]+(?:\.\d{1,2})?)/,
-    );
-    const structuredPrice = Number(item["dealnews:price"]);
+    const structuredPrice =
+      source.name === "HotUKDeals"
+        ? ukPrice
+          ? Number(ukPrice[1].replace(/,/g, ""))
+          : NaN
+        : source.name === "DealNews"
+          ? Number(item["dealnews:price"])
+          : NaN;
     const parsedPrice =
       Number.isFinite(structuredPrice) && structuredPrice > 0
         ? structuredPrice
-        : source.name === "DealNews" ||
-            /\b(?:up to|save|extra|take)\s+[$£]|[$£]\s*[\d,.]+\s*(?:off|cashback|credit|coupon|gift card|shipping)/i.test(
-              priceText,
-            )
-          ? null
-          : priceMatch
-            ? Number(priceMatch[1].replace(/,/g, ""))
-            : null;
+        : null;
     const discountMatch = title.match(
       /(up to\s+)?(\d{1,2})%\s*(?:off|discount)/i,
     );

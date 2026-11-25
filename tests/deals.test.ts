@@ -63,6 +63,25 @@ test("dollar savings and trade-in credits are not purchase prices", () => {
   );
 });
 
+test("Slickdeals prose never becomes a numeric purchase-price quote", () => {
+  const [ipad] = parseFeed(
+    rss(
+      "<title>Apple iPad Mini $600</title><description>Costco has it for $599.99 ($100 off).</description>",
+    ),
+    sources[0],
+    now,
+  );
+  const [ring] = parseFeed(
+    rss(
+      "<title>Ring Indoor Cam $20</title><description>Listed for $24.99, then $19.99 after a $5 checkout discount.</description>",
+    ),
+    sources[0],
+    now,
+  );
+  assert.equal(ipad.price, null);
+  assert.equal(ring.price, null);
+});
+
 test("omits expired and old offers, and unsafe external URLs", () => {
   assert.equal(
     parseFeed(
@@ -141,8 +160,10 @@ test("unknown prices and discounts sort after explicit values", () => {
     now,
   );
   const [priced] = parseFeed(
-    rss("<title>Furniture $25: 30% off</title>"),
-    sources[0],
+    rss(
+      "<title>Furniture $25: 30% off</title><dealnews:price>25</dealnews:price>",
+    ),
+    sources[2],
     now,
   );
   assert.equal(
