@@ -35,6 +35,9 @@ function safeUrl(value: unknown): string | null {
 }
 
 export function categorize(text: string): Category {
+  // Household steam cleaners are not Steam games or gaming hardware.
+  if (/\b(vacuums?|carpet cleaners?|steam (?:cleaners?|mops?))\b/i.test(text))
+    return "Home & living";
   if (
     /\b(playstation|xbox|nintendo|gaming|dualsense|video game|steam|lego)\b/i.test(
       text,
@@ -42,7 +45,7 @@ export function categorize(text: string): Category {
   )
     return "Gaming";
   if (
-    /\b(laptop|computer|monitor|ssd|tv|oled|headphone|earbud|iphone|ipad|tablet|usb|anker|samsung|macbook|speaker|camera|pixel|charger|smartwatch|router)\b/i.test(
+    /\b(laptop|computer|monitor|ssd|tv|oled|headphones?|earbuds?|iphone|ipad|tablet|usb|anker|samsung|macbook|speaker|camera|pixel|charger|smartwatch|router)\b/i.test(
       text,
     )
   )

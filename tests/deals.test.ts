@@ -1,9 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseFeed, sources } from "../lib/parse-feed";
+import { categorize, parseFeed, sources } from "../lib/parse-feed";
 import { filterDeals } from "../lib/filters";
 
 const now = Date.parse("2026-11-25T12:00:00Z");
+
+test("plural audio products are Tech and steam cleaners are household finds", () => {
+  assert.equal(categorize("Beats Solo 4 On-Ear Wireless Headphones"), "Tech");
+  assert.equal(
+    categorize("Refurb Sony WH-1000XM6 Noise Canceling Headphones"),
+    "Tech",
+  );
+  assert.equal(categorize("Wireless earbuds"), "Tech");
+  assert.equal(
+    categorize("Dreame N20 Steam Carpet Cleaner Machine"),
+    "Home & living",
+  );
+  assert.equal(categorize("Steam mop"), "Home & living");
+  assert.equal(categorize("Steam Deck"), "Gaming");
+  assert.equal(categorize("PC game on Steam"), "Gaming");
+});
+
 function rss(item: string) {
   return `<rss xmlns:pepper="http://www.pepper.com/rss" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dealnews="https://www.dealnews.com/ns/rss/1.0.htm"><channel><item><guid>123</guid><link>https://example.com/deal</link><pubDate>Wed, 25 Nov 2026 11:00:00 GMT</pubDate>${item}</item></channel></rss>`;
 }
