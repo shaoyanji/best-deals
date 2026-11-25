@@ -29,6 +29,8 @@ export type Deal = {
 export type Feed = {
   deals: Deal[];
   updatedAt: string;
+  /** Last refresh attempt, including failures; optional for older cache entries. */
+  checkedAt?: string;
   stale: boolean;
   unavailableSources: string[];
   storage: "supabase" | "memory";

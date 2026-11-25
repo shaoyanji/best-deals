@@ -4,8 +4,15 @@ import { parseFeed, sources } from "./parse-feed";
 import type { Deal, Feed } from "./types";
 
 const TTL = 15 * 60_000;
+const RETRY_TTL = 60_000;
 let cached: Feed | null = null;
 let pending: Promise<Feed> | null = null;
+
+function isFresh(feed: Feed) {
+  const checkedAt = Date.parse(feed.checkedAt ?? feed.updatedAt);
+  const ttl = feed.stale || !feed.deals.length ? RETRY_TTL : TTL;
+  return Date.now() - checkedAt < ttl;
+}
 
 function database() {
   const url = process.env.SUPABASE_URL;
@@ -29,8 +36,7 @@ async function refresh(): Promise<Feed> {
       .maybeSingle();
     if (!error && data?.payload) {
       previous = data.payload as Feed;
-      if (Date.now() - Date.parse(previous.updatedAt) < TTL && !previous.stale)
-        return { ...previous, storage: "supabase" };
+      if (isFresh(previous)) return { ...previous, storage: "supabase" };
     }
   }
   const results = await Promise.allSettled(
@@ -66,18 +72,19 @@ async function refresh(): Promise<Feed> {
   ].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const feed: Feed = {
     deals,
+    checkedAt: new Date(Date.now()).toISOString(),
     updatedAt: live.length
-      ? new Date().toISOString()
-      : (previous?.updatedAt ?? new Date().toISOString()),
+      ? new Date(Date.now()).toISOString()
+      : (previous?.updatedAt ?? new Date(Date.now()).toISOString()),
     stale: unavailableSources.length > 0,
     unavailableSources,
     storage: db ? "supabase" : "memory",
   };
-  if (db && live.length) {
+  if (db) {
     const { error } = await db.from("feed_cache").upsert({
       id: "main",
       payload: feed,
-      updated_at: new Date().toISOString(),
+      updated_at: feed.checkedAt,
     });
     if (error) {
       console.error("Supabase cache write failed:", error.code);
@@ -88,7 +95,7 @@ async function refresh(): Promise<Feed> {
 }
 
 export async function getDealFeed(): Promise<Feed> {
-  if (cached && Date.now() - Date.parse(cached.updatedAt) < TTL) return cached;
+  if (cached && isFresh(cached)) return cached;
   if (!pending)
     pending = refresh()
       .then((feed) => {
