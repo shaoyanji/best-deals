@@ -47,13 +47,19 @@ globalThis.fetch = async (input, options) => {
   if (!healthy && scenario !== "shared-empty") throw new Error("Feed outage");
   const date = new Date(now).toISOString();
   // An invalid item is a successfully fetched feed with no accepted listings.
-  return new Response(`<rss><channel><item><title>USB charger</title><link>${scenario === "shared-empty" ? "http://invalid.example" : "https://retailer.example/charger"}</link><pubDate>${date}</pubDate></item></channel></rss>`);
+  return new Response(
+    `<rss><channel><item><title>USB charger</title><link>${scenario === "shared-empty" ? "http://invalid.example" : "https://retailer.example/charger"}</link><pubDate>${date}</pubDate></item></channel></rss>`,
+  );
 };
 
 async function main() {
   const first = await getDealFeed();
   if (scenario === "shared-read") {
-    assert.equal(upstreamCalls, 0, "cold starts honor the shared outage backoff");
+    assert.equal(
+      upstreamCalls,
+      0,
+      "cold starts honor the shared outage backoff",
+    );
     assert.equal(reads, 1);
     assert.equal(writes, 0);
     assert.equal(first.storage, "supabase");
@@ -65,17 +71,31 @@ async function main() {
   if (scenario !== "memory") {
     assert.equal(writes, 1, "failed and empty refresh attempts are persisted");
     assert.equal(payload.checkedAt, first.checkedAt);
-    assert.equal(first.updatedAt, oldUpdate, "attempts do not imply fresh listings");
+    assert.equal(
+      first.updatedAt,
+      oldUpdate,
+      "attempts do not imply fresh listings",
+    );
   }
   now += 59_999;
   await Promise.all(Array.from({ length: 8 }, () => getDealFeed()));
-  assert.equal(upstreamCalls, sources.length, "requests during backoff do not refetch");
+  assert.equal(
+    upstreamCalls,
+    sources.length,
+    "requests during backoff do not refetch",
+  );
   assert.equal(reads, scenario === "memory" ? 0 : 1);
 
   now += 1;
   healthy = true;
-  const recovered = await Promise.all(Array.from({ length: 8 }, () => getDealFeed()));
-  assert.equal(upstreamCalls, sources.length * 2, "one shared retry occurs at the boundary");
+  const recovered = await Promise.all(
+    Array.from({ length: 8 }, () => getDealFeed()),
+  );
+  assert.equal(
+    upstreamCalls,
+    sources.length * 2,
+    "one shared retry occurs at the boundary",
+  );
   if (scenario === "shared-empty") {
     assert.equal(recovered[0].deals.length, 0);
     assert.equal(recovered[0].updatedAt, oldUpdate);
@@ -85,7 +105,11 @@ async function main() {
     assert.equal(recovered[0].updatedAt, new Date(now).toISOString());
     now += 60_000;
     await getDealFeed();
-    assert.equal(upstreamCalls, sources.length * 2, "healthy caches keep their longer TTL");
+    assert.equal(
+      upstreamCalls,
+      sources.length * 2,
+      "healthy caches keep their longer TTL",
+    );
   }
 }
 

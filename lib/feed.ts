@@ -36,8 +36,7 @@ async function refresh(): Promise<Feed> {
       .maybeSingle();
     if (!error && data?.payload) {
       previous = data.payload as Feed;
-      if (isFresh(previous))
-        return { ...previous, storage: "supabase" };
+      if (isFresh(previous)) return { ...previous, storage: "supabase" };
     }
   }
   const results = await Promise.allSettled(
