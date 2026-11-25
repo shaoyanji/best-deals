@@ -24,7 +24,7 @@ npm run build
 
 ## Deploy to Vercel
 
-Import this GitHub repository, select Next.js, use Node.js 24, and add the two environment variables above to production and preview. Vercel runs `npm run build` automatically. No paid services or cron jobs are required. Request-time refresh runs at most once per 15 minutes per healthy cache. Concurrent requests in one instance share one refresh. Across instances, occasional concurrent refreshes are harmless last-write-wins updates.
+Import this GitHub repository, select Next.js, use Node.js 24, and add the two environment variables above to production and preview. Vercel runs `npm run build` automatically. No paid services or cron jobs are required. Request-time refresh runs at most once per 15 minutes per healthy cache. Failed or empty refreshes wait one minute before retrying, without advancing the last successful update time; the attempt time is also shared through Supabase. Concurrent requests in one instance share one refresh. Across instances, occasional concurrent refreshes are harmless last-write-wins updates.
 
 ## Product behavior
 
