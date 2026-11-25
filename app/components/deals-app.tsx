@@ -342,6 +342,16 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
     ? savedDeals.map((d) => feed.deals.find((f) => f.id === d.id) ?? d)
     : feed.deals;
   const filtered = filterDeals(allDeals, query, category, region, sort);
+  const pricedCount = filtered.filter((deal) => deal.price !== null).length;
+  const hasSearchFilters = query.trim() !== "" || category !== "All finds";
+  const sortHelp =
+    region === "all"
+      ? "Choose one region to sort by price. US and UK currencies are not converted."
+      : !pricedCount
+        ? "Price sorting is unavailable for these results: the sources have not provided sortable prices. Check each source for the current price."
+        : sort === "price"
+          ? `${pricedCount} of ${filtered.length} finds have sortable prices. Finds without a price appear last. Confirm current prices at the source.`
+          : "";
   const featured =
     feed.deals.find((d) => d.image && d.category === "Tech") ??
     feed.deals.find((d) => d.image);
@@ -570,19 +580,29 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
                 <SlidersHorizontal size={15} />
                 <select
                   aria-label="Sort deals"
+                  aria-describedby={sortHelp ? "sort-help" : undefined}
                   value={sort}
                   onChange={(e) => setSort(e.target.value as Sort)}
                 >
                   <option value="recent">Newest first</option>
                   <option value="discount">Biggest % off</option>
                   {region !== "all" && (
-                    <option value="price">Price: low to high</option>
+                    <option value="price" disabled={!pricedCount}>
+                      {pricedCount
+                        ? "Price: low to high"
+                        : "Price: unavailable"}
+                    </option>
                   )}
                 </select>
                 <ChevronDown size={14} />
               </label>
             </div>
           </div>
+          {sortHelp && (
+            <p id="sort-help" className="saved-explainer" role="status">
+              {sortHelp}
+            </p>
+          )}
           {feed.stale && !savedOnly && (
             <div className="feed-warning">
               {feed.unavailableSources.join(", ")}{" "}
@@ -629,14 +649,22 @@ export default function DealsApp({ initialFeed }: { initialFeed: Feed }) {
               <button
                 className="primary"
                 onClick={() => {
-                  clear();
                   if (!feed.deals.length && !savedOnly) void refresh();
-                  else setSavedOnly(false);
+                  else if (hasSearchFilters) {
+                    setQuery("");
+                    setCategory("All finds");
+                    searchRef.current?.focus();
+                  } else if (savedOnly) setSavedOnly(false);
+                  else void refresh();
                 }}
               >
                 {!feed.deals.length && !savedOnly
                   ? "Try refreshing"
-                  : "Explore all finds"}
+                  : hasSearchFilters
+                    ? "Clear search and category"
+                    : savedOnly
+                      ? "Explore all finds"
+                      : "Try refreshing"}
                 <ArrowRight size={17} />
               </button>
             </div>
