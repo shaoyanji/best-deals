@@ -16,7 +16,7 @@ const heading = Manrope({
 export const metadata: Metadata = {
   title: "bestdeals — Good finds. Great prices.",
   description:
-    "One little corner of the internet for worthwhile deals. Discover the latest finds from Slickdeals, HotUKDeals and DealNews, and save your favorites.",
+    "One little corner of the internet for worthwhile deals. Discover the latest finds from the US, UK and Germany, and save your favorites.",
   robots: { index: true, follow: true },
 };
 export const viewport: Viewport = { themeColor: "#f8f9f6" };

@@ -50,10 +50,11 @@ import {
 import { refreshFeed } from "@/lib/refresh-feed";
 
 const icons = [Grid2X2, Laptop, House, Shirt, Gamepad2, Leaf, ShoppingBag];
+const moneyLocales = { US: "en-US", UK: "en-GB", DE: "de-DE" };
 const money = (deal: Deal) =>
   deal.price === null
     ? null
-    : new Intl.NumberFormat(deal.region === "UK" ? "en-GB" : "en-US", {
+    : new Intl.NumberFormat(moneyLocales[deal.region], {
         style: "currency",
         currency: deal.currency,
         maximumFractionDigits: 2,
@@ -143,7 +144,10 @@ function DealCard({
       <div className="card-content">
         <div className="merchant-line">
           <span>{deal.merchant}</span>
-          <span>{deal.region}</span>
+          <span>
+            {deal.region}
+            {deal.inStore && " · In store"}
+          </span>
         </div>
         <h3>
           <button onClick={() => open(deal)}>{deal.title}</button>
@@ -252,6 +256,7 @@ function DealDialog({
       <div className="dialog-content">
         <div className="eyebrow">
           {deal.merchant} <span> / </span> {deal.region} deal
+          {deal.inStore && " · In store"}
         </div>
         <h2 id="deal-title">{deal.title}</h2>
         {availability && (
@@ -489,7 +494,7 @@ export default function DealsApp({
   const sortHelp = savedPending
     ? ""
     : region === "all"
-      ? "Choose one region to sort by price. US and UK currencies are not converted."
+      ? "Choose one region to sort by price. Currencies are not converted."
       : !pricedCount
         ? "Price sorting is unavailable for these results: the sources have not provided sortable prices. Check each source for the current price."
         : sort === "price"
@@ -583,6 +588,8 @@ export default function DealsApp({
               <b>Slickdeals</b>
               <b>HotUKDeals</b>
               <b>DealNews</b>
+              <b>Schnäppchenfuchs</b>
+              <b>DealDoktor</b>
             </div>
           </div>
           <div className="hero-art" aria-label="A find from the latest feed">
@@ -669,9 +676,10 @@ export default function DealsApp({
                     setSort("recent");
                 }}
               >
-                <option value="all">US + UK deals</option>
+                <option value="all">All regions</option>
                 <option value="US">United States · $</option>
                 <option value="UK">United Kingdom · £</option>
+                <option value="DE">Germany · €</option>
               </select>
               <ChevronDown size={15} />
             </div>
@@ -900,9 +908,9 @@ export default function DealsApp({
         </div>
         <div className="footer-bottom">
           <p>
-            Curated feeds, not the whole internet. Offers link to Slickdeals,
-            HotUKDeals and DealNews; source sites may use affiliate links.
-            Prices, shipping and availability can change.
+            Curated feeds, not the whole internet. Offers link to the original
+            listings; source sites may use affiliate links. Prices, shipping and
+            availability can change.
           </p>
           <span>Made for the find.</span>
         </div>

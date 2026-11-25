@@ -40,6 +40,84 @@ test("UK structured price, merchant, image, category, entities and heat prefix a
   assert.equal(deal.image, "https://example.com/image.jpg");
 });
 
+test("German editorial feeds keep source links, images and EUR without guessing prices", () => {
+  const [fuchs] = parseFeed(
+    rss(
+      '<title>Degusta Box Black Friday: 2 Boxen für 17€</title><category domain="https://schnaeppchenfuchs.com/kategorien/essen-und-trinken">Essen &amp; Trinken</category><media:content url="https://img-01.schnaeppchenfuchs.com/degusta.png?w=300&amp;h=150"/>',
+    ).replace(
+      "https://example.com/deal",
+      "https://schnaeppchenfuchs.com/angebote/degusta-box-black-friday",
+    ),
+    sources[3],
+    now,
+  );
+  const [doktor] = parseFeed(
+    rss(
+      '<title>Nintendo Switch 2 für 49€ + Tarif für 22,49€ + 50€ Wechselbonus</title><content:encoded><![CDATA[<img src="https://www.dealdoktor.de/app/uploads/switch.png">]]></content:encoded>',
+    ),
+    sources[4],
+    now,
+  );
+  assert.equal(fuchs.source, "Schnäppchenfuchs");
+  assert.equal(
+    fuchs.url,
+    "https://schnaeppchenfuchs.com/angebote/degusta-box-black-friday",
+  );
+  assert.equal(
+    fuchs.image,
+    "https://img-01.schnaeppchenfuchs.com/degusta.png?w=300&h=150",
+  );
+  assert.equal(doktor.source, "DealDoktor");
+  assert.equal(
+    doktor.image,
+    "https://www.dealdoktor.de/app/uploads/switch.png",
+  );
+  for (const deal of [fuchs, doktor]) {
+    assert.equal(deal.region, "DE");
+    assert.equal(deal.currency, "EUR");
+    assert.equal(deal.price, null);
+    assert.equal(deal.inStore, undefined);
+  }
+  const [us] = parseFeed(rss("<title>US offer</title>"), sources[0], now);
+  assert.deepEqual(
+    filterDeals([fuchs, us, doktor], "", "All finds", "DE", "recent"),
+    [fuchs, doktor],
+  );
+});
+
+test("German community deals mark explicit store availability, not ambiguous store mentions", () => {
+  const source = sources[5];
+  for (const description of [
+    "Gültig in allen Filialen. Coupon mehrfach einlösbar.",
+    "Bald ist Nikolaus: In einigen IKEA-Einrichtungshäusern dürfen eure Kinder ihren Stiefel befüllen lassen.",
+    "Das Angebot gilt nur in der Filiale.",
+  ]) {
+    const [deal] = parseFeed(
+      rss(
+        `<title>Community offer</title><description><![CDATA[<p>${description}</p>]]></description>`,
+      ),
+      source,
+      now,
+    );
+    assert.equal(deal.source, "DealDoktor Community");
+    assert.equal(deal.inStore, true);
+  }
+  const [local] = parseFeed(
+    rss("<title>[Lokal] Netto-MD: Rabatt kleben und sparen</title>"),
+    source,
+    now,
+  );
+  assert.equal(local.inStore, true);
+  const [unmarked] = parseFeed(
+    rss(
+      "<title>Online-Angebot</title><description>Nicht gültig in allen Filialen. Nicht nur vor Ort erhältlich.</description>",
+    ),
+    source,
+    now,
+  );
+  assert.equal(unmarked.inStore, undefined);
+});
+
 test("keeps up-to discounts distinct and does not invent a promotion price", () => {
   const [deal] = parseFeed(
     rss("<title>Furniture sale: Up to 80% off</title>"),

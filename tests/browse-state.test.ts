@@ -30,6 +30,12 @@ test("invalid filters and mixed-currency price sorts fall back safely", () => {
   assert.equal(readBrowseState("?sort=discount").sort, "discount");
 });
 
+test("Germany is a shareable region filter", () => {
+  const state = readBrowseState("?region=DE&saved=1");
+  assert.equal(state.region, "DE");
+  assert.equal(writeBrowseState("", state), "region=DE&saved=1");
+});
+
 test("clearing search and category keeps the chosen UK region", () => {
   const state = readBrowseState("?q=washing+machine&category=Style&region=UK");
   const search = writeBrowseState(

@@ -1,4 +1,4 @@
-import { categories, type Category, type Region } from "./types";
+import { categories, currencies, type Category, type Region } from "./types";
 import type { Sort } from "./filters";
 
 export type BrowseState = {
@@ -14,7 +14,8 @@ export function readBrowseState(search: string): BrowseState {
   const category = params.get("category");
   const region = params.get("region");
   const sort = params.get("sort");
-  const validRegion = region === "UK" || region === "US" ? region : "all";
+  const validRegion =
+    region && Object.hasOwn(currencies, region) ? (region as Region) : "all";
   return {
     query: params.get("q") ?? "",
     category: categories.includes(category as Category)

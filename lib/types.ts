@@ -8,17 +8,26 @@ export const categories = [
   "Everyday",
 ] as const;
 export type Category = (typeof categories)[number];
-export type Region = "all" | "US" | "UK";
+export const currencies = { US: "USD", UK: "GBP", DE: "EUR" } as const;
+type DealRegion = keyof typeof currencies;
+export type Region = "all" | DealRegion;
 export type Deal = {
   id: string;
   title: string;
   description: string;
   url: string;
   image: string | null;
-  source: "Slickdeals" | "HotUKDeals" | "DealNews";
+  source:
+    | "Slickdeals"
+    | "HotUKDeals"
+    | "DealNews"
+    | "Schnäppchenfuchs"
+    | "DealDoktor"
+    | "DealDoktor Community";
   merchant: string;
-  region: "US" | "UK";
-  currency: "USD" | "GBP";
+  region: DealRegion;
+  currency: (typeof currencies)[DealRegion];
+  inStore?: true;
   price: number | null;
   discount: number | null;
   upTo: boolean;
